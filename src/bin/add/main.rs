@@ -45,6 +45,7 @@ Specify what crate to add:
 Specify where to add the crate:
     -D --dev                Add crate as development dependency.
     -B --build              Add crate as build dependency.
+    -P --plain              Output dependency string on stdout
     --optional              Add as an optional dependency (for use in features). This does not work
                             for `dev-dependencies` or `build-dependencies`.
     --target <target>       Add as dependency to the given target platform. This does not work
@@ -75,20 +76,28 @@ fn handle_add(args: &Args) -> Result<()> {
     let mut manifest = Manifest::open(&manifest_path)?;
     let deps = &args.parse_dependencies()?;
 
-    deps.iter()
-        .map(|dep| {
-            manifest
-                .insert_into_table(&args.get_section(), dep)
-                .map_err(Into::into)
-        })
-        .collect::<Result<Vec<_>>>()
-        .map_err(|err| {
-            println!("Could not edit `Cargo.toml`.\n\nERROR: {}", err);
-            err
-        })?;
 
-    let mut file = Manifest::find_file(&manifest_path)?;
-    manifest.write_to_file(&mut file)?;
+    if args.flag_plain {
+        for dep in deps {
+            let (ref name, ref mut new_dependency) = dep.to_toml();
+            println!("{} = {}", name, new_dependency);
+        }
+    } else {
+        deps.iter()
+            .map(|dep| {
+                manifest
+                    .insert_into_table(&args.get_section(), dep)
+                    .map_err(Into::into)
+            })
+        .collect::<Result<Vec<_>>>()
+            .map_err(|err| {
+                println!("Could not edit `Cargo.toml`.\n\nERROR: {}", err);
+                err
+            })?;
+
+        let mut file = Manifest::find_file(&manifest_path)?;
+        manifest.write_to_file(&mut file)?;
+    }
 
     Ok(())
 }
